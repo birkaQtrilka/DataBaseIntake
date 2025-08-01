@@ -2,84 +2,119 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.ArrayList;
 import java.util.stream.Stream;
 
 public class App {
     public static void main(String[] args) throws Exception {
-        int runs = 5;
-        String filePath = "anagrams_1_000_000.txt";
+        int runs = 30;
+        String filePath = "anagrams_1_000_000_000.txt";
 
-        // Parallel version timing
+        System.out.println("\n\nDifferent batch sizes for 8 threads: \n");
+        ParallelTest(filePath, runs, 8, 1000); 
+        ParallelTest(filePath, runs, 8, 10_000); 
+        ParallelTest(filePath, runs, 8, 100_000); 
+        ParallelTest(filePath, runs, 8, 1_000_000); 
+
+        System.out.println("\n\nDifferent batch sizes for 12 threads: \n");
+        ParallelTest(filePath, runs, 12, 1000); 
+        ParallelTest(filePath, runs, 12, 10_000); 
+        ParallelTest(filePath, runs, 12, 100_000); 
+        ParallelTest(filePath, runs, 12, 1_000_000); 
+
+        System.out.println("\n\nDifferent batch sizes for 16 threads: \n");
+        ParallelTest(filePath, runs, 16, 1000); 
+        ParallelTest(filePath, runs, 16, 10_000); 
+        ParallelTest(filePath, runs, 16, 100_000); 
+        ParallelTest(filePath, runs, 16, 1_000_000); 
+
+        //SyncTest(filePath, runs);
+    }
+
+    public static void ParallelTest(String filePath, int runs, int numThreads, int batchSize) throws Exception {
         double totalParallel = 0;
-        HashMap<AnagramKey, List<String>> tableParallel = null;
+        System.out.println("Using " + numThreads + " threads. Batch size: " + batchSize);
         for (int i = 0; i < runs; i++) {
+            System.gc();
+            Thread.sleep(100);
             long startTime = System.nanoTime();
-            tableParallel = getAnagramTableParallel(filePath);
+            HashMap<AnagramKey, List<String>> tableParallel  = getAnagramTableParallel(filePath, numThreads, batchSize);
             long endTime = System.nanoTime();
             double durationMs = (endTime - startTime) / 1_000_000.0;
-            System.out.printf("Parallel Run %d: %.2f ms\n", i + 1, durationMs);
             totalParallel += durationMs;
         }
         double avgParallel = totalParallel / runs;
         System.out.printf("Parallel average execution time: %.2f ms\n", avgParallel);
-        System.out.println("Parallel table size: " + tableParallel.size());
-        // Synchronous version timing
+
+    }
+
+    public static void SyncTest(String filePath, int runs) throws Exception {
         double totalSync = 0;
-        HashMap<AnagramKey, List<String>> tableSync = null;
+        
         for (int i = 0; i < runs; i++) {
+            System.gc();
+            Thread.sleep(100);
             long startTime = System.nanoTime();
-            tableSync = getAnagramTableSync(filePath);
+            HashMap<AnagramKey, List<String>> tableSync = getAnagramTableSync(filePath);
             long endTime = System.nanoTime();
             double durationMs = (endTime - startTime) / 1_000_000.0;
-            System.out.printf("Sync Run %d: %.2f ms\n", i + 1, durationMs);
+            // System.out.printf("Sync Run %d: %.2f ms\n", i + 1, durationMs);
             totalSync += durationMs;
         }
         double avgSync = totalSync / runs;
         System.out.printf("Sync average execution time: %.2f ms\n", avgSync);
-        System.out.println("Sync table size: " + tableSync.size());
     }
 
-    public static HashMap<AnagramKey, List<String>> getAnagramTableParallel(String filePath) throws Exception {
-        int numThreads = Runtime.getRuntime().availableProcessors();
-        int queueCapacity = 1000;
-        BlockingQueue<String> queue = new ArrayBlockingQueue<>(queueCapacity);
-        String POISON_PILL = new String("__POISON_PILL__");
-
+    public static HashMap<AnagramKey, List<String>> getAnagramTableParallel(String filePath, int numThreads, int batchSize) throws Exception {
+        final int BATCH_SIZE = batchSize;
+        java.util.concurrent.BlockingQueue<List<String>> queue = new java.util.concurrent.LinkedBlockingQueue<>(100); // queue of batches
         ExecutorService executor = Executors.newFixedThreadPool(numThreads);
         List<Future<HashMap<AnagramKey, List<String>>>> futures = new ArrayList<>();
+
+        // Poison pill for signaling end of file (empty list)
+        final List<String> POISON_PILL = new ArrayList<>();
 
         // Start consumers
         for (int i = 0; i < numThreads; i++) {
             futures.add(executor.submit(() -> {
                 HashMap<AnagramKey, List<String>> localTable = new HashMap<>();
-                while (true) {
-                    String line = queue.take();
-                    if (line == POISON_PILL) break;
-                    AnagramKey key = new AnagramKey(line);
-                    localTable.computeIfAbsent(key, k -> new ArrayList<>()).add(line);
+                try {
+                    while (true) {
+                        List<String> batch = queue.take();
+                        if (batch == POISON_PILL) break;
+                        for (String line : batch) {
+                            AnagramKey key = new AnagramKey(line);
+                            localTable.computeIfAbsent(key, k -> new ArrayList<>()).add(line);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
                 return localTable;
             }));
         }
 
-        // Producer
+        // Producer: read file and put batches in queue
         try (Stream<String> lines = Files.lines(Paths.get(filePath))) {
-            lines.forEach(line -> {
-                try {
-                    queue.put(line);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+            List<String> batch = new ArrayList<>(BATCH_SIZE);
+            for (java.util.Iterator<String> it = lines.iterator(); it.hasNext(); ) {
+                batch.add(it.next());
+                if (batch.size() == BATCH_SIZE) {
+                    queue.put(new ArrayList<>(batch));
+                    batch.clear();
                 }
-            });
+            }
+            if (!batch.isEmpty()) {
+                queue.put(batch);
+            }
         }
         // Add poison pills to stop consumers
-        for (int i = 0; i < numThreads; i++) queue.put(POISON_PILL);
+        for (int i = 0; i < numThreads; i++) {
+            queue.put(POISON_PILL);
+        }
 
         // Merge results
         HashMap<AnagramKey, List<String>> table = new HashMap<>();
@@ -93,9 +128,10 @@ public class App {
         return table;
     }
 
+
     public static HashMap<AnagramKey, List<String>> getAnagramTableSync(String filePath) throws Exception {
         HashMap<AnagramKey, List<String>> table = new HashMap<>();
-        try (Stream<String> lines = Files.lines(Paths.get("anagrams_10000.txt"))) {
+        try (Stream<String> lines = Files.lines(Paths.get(filePath)) ) {
             lines.forEach(line -> {
                 AnagramKey key = new AnagramKey(line);
                 if (table.containsKey(key)) {
