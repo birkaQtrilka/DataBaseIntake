@@ -1,3 +1,4 @@
+
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -10,6 +11,12 @@ import java.util.stream.Stream;
 
 public class App {
     public static void main(String[] args) throws Exception {
+        String filePath = "sample.txt";
+        var table = getAnagramTableSync(filePath); 
+        writeAnagramGroupsToFile(table, "output.txt");
+    }
+
+    public static void Test1() throws Exception {
         int runs = 30;
         String filePath = "anagrams_1_000_000_000.txt";
 
@@ -30,8 +37,6 @@ public class App {
         ParallelTest(filePath, runs, 16, 10_000); 
         ParallelTest(filePath, runs, 16, 100_000); 
         ParallelTest(filePath, runs, 16, 1_000_000); 
-
-        //SyncTest(filePath, runs);
     }
 
     public static void ParallelTest(String filePath, int runs, int numThreads, int batchSize) throws Exception {
@@ -146,4 +151,14 @@ public class App {
 
         return table;
     }
+
+    public static void writeAnagramGroupsToFile(HashMap<AnagramKey, List<String>> table, String outputPath) throws Exception {
+        try (java.io.BufferedWriter writer = java.nio.file.Files.newBufferedWriter(java.nio.file.Paths.get(outputPath))) {
+            for (List<String> group : table.values()) {
+                writer.write(String.join(" ", group));
+                writer.newLine();
+            }
+        }
+    }
+    
 }
