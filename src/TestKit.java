@@ -1,7 +1,25 @@
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class TestKit {
+    public void Test2() throws Exception {
+        String filePath = "anagrams_1_000_000_000.txt";
+
+        AsyncTest(filePath,4);
+        SyncTest(filePath,4);
+    }
+
+    public void Test3() throws Exception {
+        String filePath = "anagrams_1_000_000_000.txt";
+        // SequentialTest(filePath, 5);
+        ParallelTest(filePath, 1, 16, 100000); 
+
+    }
 
     public void Test1() throws Exception {
         int runs = 30;
@@ -33,7 +51,7 @@ public class TestKit {
             System.gc();
             Thread.sleep(100);
             long startTime = System.nanoTime();
-            HashMap<AnagramKey, List<String>> tableParallel  = AnagramGrouper.getTableInParallel(filePath, numThreads, batchSize);
+            HashMap<AnagramKey, List<String>> tableParallel  = new AnagramGrouperParallel(filePath, numThreads, batchSize).getTable();
             long endTime = System.nanoTime();
             double durationMs = (endTime - startTime) / 1_000_000.0;
             totalParallel += durationMs;
@@ -43,6 +61,47 @@ public class TestKit {
 
     }
 
+    public void AsyncTest(String filePath, int runs) throws Exception {
+        // Ensure garbage collection before starting
+        System.gc();
+        Thread.sleep(100);
+
+        int numThreads = 16;
+        int batchSize = 1_000_000;
+
+        ExecutorService executor = Executors.newFixedThreadPool(runs);
+
+        long startTime = System.nanoTime();
+
+        // Create a list of CompletableFutures
+        List<CompletableFuture<HashMap<AnagramKey, List<String>>>> futures = new ArrayList<>();
+
+        for (int i = 0; i < runs; i++) {
+            CompletableFuture<HashMap<AnagramKey, List<String>>> future = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return new AnagramGrouperParallel(filePath, numThreads, batchSize).getTable();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }, executor);
+            futures.add(future);
+        }
+
+        // Wait for all to complete
+        List<HashMap<AnagramKey, List<String>>> results = futures.stream()
+            .map(CompletableFuture::join)
+            .collect(Collectors.toList());
+
+        long endTime = System.nanoTime();
+        executor.shutdown();
+
+        double durationMs = (endTime - startTime) / 1_000_000.0;
+        System.out.println("Parallel run of " + runs + " tasks took: " + durationMs + " ms");
+
+        // Optionally, do something with results
+        // System.out.println("Got " + results.size() + " tables");
+    }
+
     public void SequentialTest(String filePath, int runs) throws Exception {
         double totalSync = 0;
         
@@ -50,7 +109,7 @@ public class TestKit {
             System.gc();
             Thread.sleep(100);
             long startTime = System.nanoTime();
-            HashMap<AnagramKey, List<String>> tableSync = AnagramGrouper.getTableSequentially(filePath);
+            HashMap<AnagramKey, List<String>> tableSync = new AnagramGrouperSequential(filePath).getTable();
             long endTime = System.nanoTime();
             double durationMs = (endTime - startTime) / 1_000_000.0;
             // System.out.printf("Sync Run %d: %.2f ms\n", i + 1, durationMs);
@@ -58,5 +117,19 @@ public class TestKit {
         }
         double avgSync = totalSync / runs;
         System.out.printf("Sync average execution time: %.2f ms\n", avgSync);
+    }
+
+    public void SyncTest(String filePath, int runs) throws Exception {
+        System.out.println("Running sequential test");
+        System.gc();
+        Thread.sleep(100);
+        
+        long startTime = System.nanoTime();
+        for (int i = 0; i < runs; i++) {
+            HashMap<AnagramKey, List<String>> tableSync = new AnagramGrouperSequential(filePath).getTable();
+        }
+        long endTime = System.nanoTime();
+        double durationMs = (endTime - startTime) / 1_000_000.0;
+        System.out.printf("total time: %.2f ms\n", durationMs);
     }
 }
