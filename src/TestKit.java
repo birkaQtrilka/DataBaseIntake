@@ -10,14 +10,21 @@ public class TestKit {
     public void Test2() throws Exception {
         String filePath = "anagrams_1_000_000_000.txt";
 
-        AsyncTest(filePath,4);
-        SyncTest(filePath,4);
+        //AsyncTest(filePath,4);
+        System.out.println("testing sharding method");
+        SyncTest(4, ()-> new AnagramGrouperSharding(
+            filePath, 
+            16, 
+            100_000, 
+            1000,
+            "Shards", 
+            10));
     }
 
     public void Test3() throws Exception {
         String filePath = "anagrams_1_000_000_000.txt";
         // SequentialTest(filePath, 5);
-        ParallelTest(filePath, 1, 16, 100000); 
+        // ParallelTest(filePath, 1, 16, 100000); 
 
     }
 
@@ -102,14 +109,14 @@ public class TestKit {
         // System.out.println("Got " + results.size() + " tables");
     }
 
-    public void SequentialTest(String filePath, int runs) throws Exception {
+    public void SequentialTest(int runs, ThrowingSupplier<AnagramGrouper> factory) throws Exception {
         double totalSync = 0;
         
         for (int i = 0; i < runs; i++) {
             System.gc();
             Thread.sleep(100);
             long startTime = System.nanoTime();
-            HashMap<AnagramKey, List<String>> tableSync = new AnagramGrouperSequential(filePath).getTable();
+            HashMap<AnagramKey, List<String>> tableSync = factory.get().getTable();
             long endTime = System.nanoTime();
             double durationMs = (endTime - startTime) / 1_000_000.0;
             // System.out.printf("Sync Run %d: %.2f ms\n", i + 1, durationMs);
@@ -119,17 +126,25 @@ public class TestKit {
         System.out.printf("Sync average execution time: %.2f ms\n", avgSync);
     }
 
-    public void SyncTest(String filePath, int runs) throws Exception {
+    public void SyncTest(int runs, ThrowingSupplier<AnagramGrouper> factory) throws Exception {
         System.out.println("Running sequential test");
         System.gc();
         Thread.sleep(100);
         
         long startTime = System.nanoTime();
         for (int i = 0; i < runs; i++) {
-            HashMap<AnagramKey, List<String>> tableSync = new AnagramGrouperSequential(filePath).getTable();
+            HashMap<AnagramKey, List<String>> tableSync = factory.get().getTable();
         }
         long endTime = System.nanoTime();
         double durationMs = (endTime - startTime) / 1_000_000.0;
         System.out.printf("total time: %.2f ms\n", durationMs);
+    }
+
+    public void SyncTest(String filePath, int runs) throws Exception {
+        SyncTest(runs, ()-> new AnagramGrouperSequential(filePath));
+    }
+
+    public void SequentialTest(String filePath, int runs) throws Exception {
+        SequentialTest(runs, ()-> new AnagramGrouperSequential(filePath));
     }
 }

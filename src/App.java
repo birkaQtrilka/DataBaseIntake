@@ -3,9 +3,9 @@ import java.util.List;
 
 public class App {
     public static void main(String[] args) throws Exception {
-
+        
         var t = new TestKit();
-        t.Test3();
+        t.Test2();
         // String filePath = "sample.txt";
         // AnagramGrouper grouper = new AnagramGrouperSequential(filePath);
         // HashMap<AnagramKey, List<String>> table = grouper.getTable();
