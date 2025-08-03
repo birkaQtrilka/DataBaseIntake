@@ -34,7 +34,7 @@ public class App {
         AnagramGrouper grouper = new AnagramGrouperSequential(filePath);
         HashMap<AnagramKey, List<String>> table = grouper.getTable();
         GroupedWriter.writeMapToFile(table, Paths.get("output.txt"));
-        System.out.println("Press Enter to exit...");
+        System.out.println("DONE! Press Enter to exit...");
         System.in.read(); 
     }
 
@@ -51,6 +51,7 @@ public class App {
             200
         ).getTable();
         System.out.println("result is in the folder GroupedFiles/FinalOutput");
+        System.out.println("DONE! Press Enter to exit...");
         System.out.println("Press Enter to exit...");
         System.in.read(); 
     }
