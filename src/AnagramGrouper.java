@@ -11,6 +11,4 @@ public abstract class AnagramGrouper {
 
     public abstract HashMap<AnagramKey, List<String>> getTable() throws Exception;
     
-    public abstract void writeTableToFile(HashMap<AnagramKey, List<String>> table, String filePath) throws Exception;
-
 }

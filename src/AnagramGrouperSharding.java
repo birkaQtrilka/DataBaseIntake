@@ -8,7 +8,6 @@ public class AnagramGrouperSharding extends AnagramGrouper {
     private final int numThreads;
     private final int batchSize;
     private final int numShards;
-    private final int outputMapCount;
     private final Path shardDir;
     private final Path groupedNamesDir;
     private final String extension = ".txt";
@@ -28,7 +27,6 @@ public class AnagramGrouperSharding extends AnagramGrouper {
         this.numShards = numShards;
         this.shardDir = Paths.get(shardDirPath);
         this.groupedNamesDir = Paths.get("GroupedFiles");
-        this.outputMapCount = outputMapCount;
 
         Files.createDirectories(shardDir);
         Files.createDirectories(groupedNamesDir);
@@ -129,14 +127,5 @@ public class AnagramGrouperSharding extends AnagramGrouper {
 
         if(count == 0) return fileName;
         return baseName + "_" + count + extension;
-    }
-
-    @Override
-    public void writeTableToFile(HashMap<AnagramKey, List<String>> table, String filePath) throws Exception {
-        GroupedWriter.writeMapToFile(table, Paths.get(filePath));
-    }
-
-    public void writeTableToFile(String filePath) throws Exception {
-        GroupedWriter.writeFromShards(shardDir, numShards, outputMapCount, Paths.get(filePath));
     }
 }

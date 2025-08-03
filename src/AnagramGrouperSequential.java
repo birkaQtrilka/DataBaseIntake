@@ -1,3 +1,4 @@
+
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -28,17 +29,6 @@ public class AnagramGrouperSequential extends AnagramGrouper{
         }
 
         return table;
-    }
-
-    @Override
-    public void writeTableToFile(HashMap<AnagramKey, List<String>> table, String outputPath) throws Exception {
-        try (java.io.BufferedWriter writer = java.nio.file.Files.newBufferedWriter(java.nio.file.Paths.get(outputPath))) {
-            for (List<String> group : table.values()) {
-                writer.write(String.join(" ", group));
-                System.out.println("Writing group: " + group);
-                writer.newLine();
-            }
-        }
     }
 
 }

@@ -12,13 +12,46 @@ public class App {
         // var t = new TestKit();
         // t.Test2();
         // CompareShardsContent();        
+        if (args.length > 0) {
+            String runMode = args[0];
+            if(runMode.equalsIgnoreCase("sequential"))
+            {
+                runDefault();
+            } else if(runMode.equalsIgnoreCase("sharding")) {
+                runSharding();
+            }
+            else {
+                runDefault();
+            }
+        }
+        else
+            runDefault();
+    }
+
+    private static void runDefault() throws Exception {
+        System.out.println("Running in sequential mode...");
         String filePath = "sample.txt";
         AnagramGrouper grouper = new AnagramGrouperSequential(filePath);
         HashMap<AnagramKey, List<String>> table = grouper.getTable();
-        grouper.writeTableToFile(table, "output.txt");
+        GroupedWriter.writeMapToFile(table, Paths.get("output.txt"));
         System.out.println("Press Enter to exit...");
         System.in.read(); 
+    }
 
+    private static void runSharding() throws Exception {
+        System.out.println("Running in sharding mode...");
+
+        String filePath = "anagrams_1_000_000_000.txt";
+        new AnagramGrouperSharding(
+            filePath,
+            16, 
+            100_000, 
+            1000, 
+            filePath, 
+            200
+        ).getTable();
+        System.out.println("result is in the folder GroupedFiles/FinalOutput");
+        System.in.read(); 
     }
 
     private static void CompareShardsContent() throws Exception
