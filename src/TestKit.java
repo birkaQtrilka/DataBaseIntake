@@ -12,7 +12,7 @@ public class TestKit {
 
         //AsyncTest(filePath,4);
         System.out.println("testing sharding method");
-        SyncTest(4, ()-> new AnagramGrouperSharding(
+        SyncTest(1, ()-> new AnagramGrouperSharding(
             filePath, 
             16, 
             100_000, 
@@ -23,8 +23,8 @@ public class TestKit {
 
     public void Test3() throws Exception {
         String filePath = "anagrams_1_000_000_000.txt";
-        // SequentialTest(filePath, 5);
-        // ParallelTest(filePath, 1, 16, 100000); 
+        SequentialTest(filePath, 5);
+        ParallelTest(filePath, 1, 16, 100000); 
 
     }
 
@@ -58,7 +58,7 @@ public class TestKit {
             System.gc();
             Thread.sleep(100);
             long startTime = System.nanoTime();
-            HashMap<AnagramKey, List<String>> tableParallel  = new AnagramGrouperParallel(filePath, numThreads, batchSize).getTable();
+            new AnagramGrouperParallel(filePath, numThreads, batchSize).getTable();
             long endTime = System.nanoTime();
             double durationMs = (endTime - startTime) / 1_000_000.0;
             totalParallel += durationMs;
@@ -95,7 +95,7 @@ public class TestKit {
         }
 
         // Wait for all to complete
-        List<HashMap<AnagramKey, List<String>>> results = futures.stream()
+        futures.stream()
             .map(CompletableFuture::join)
             .collect(Collectors.toList());
 
@@ -116,7 +116,7 @@ public class TestKit {
             System.gc();
             Thread.sleep(100);
             long startTime = System.nanoTime();
-            HashMap<AnagramKey, List<String>> tableSync = factory.get().getTable();
+            factory.get().getTable();
             long endTime = System.nanoTime();
             double durationMs = (endTime - startTime) / 1_000_000.0;
             // System.out.printf("Sync Run %d: %.2f ms\n", i + 1, durationMs);
@@ -133,7 +133,7 @@ public class TestKit {
         
         long startTime = System.nanoTime();
         for (int i = 0; i < runs; i++) {
-            HashMap<AnagramKey, List<String>> tableSync = factory.get().getTable();
+            factory.get().getTable();
         }
         long endTime = System.nanoTime();
         double durationMs = (endTime - startTime) / 1_000_000.0;
