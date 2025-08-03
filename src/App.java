@@ -11,7 +11,7 @@ public class App {
         
         // var t = new TestKit();
         // t.Test2();
-        // CompareShardsContent();        
+        // CompareShardsContent();      
         if (args.length > 0) {
             String runMode = args[0];
             if(runMode.equalsIgnoreCase("sequential"))
@@ -47,10 +47,11 @@ public class App {
             16, 
             100_000, 
             1000, 
-            filePath, 
+            "Shards", 
             200
         ).getTable();
         System.out.println("result is in the folder GroupedFiles/FinalOutput");
+        System.out.println("Press Enter to exit...");
         System.in.read(); 
     }
 
