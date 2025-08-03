@@ -27,6 +27,10 @@ public class AnagramKey {
 
     @Override
     public String toString() {
-        return Arrays.toString(count);
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < count.length; i++) {
+            builder.append(count[i]);
+        }
+        return builder.toString();
     }
 }

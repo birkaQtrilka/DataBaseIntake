@@ -10,6 +10,7 @@ public class AnagramGrouperSharding extends AnagramGrouper{
     private final int batchSize;
     private final int numShards;
     private final Path shardDir;
+    private final Path groupedNamesDir;
     private final String shardDirPath;
     private final int outputMapCount;
 
@@ -26,7 +27,9 @@ public class AnagramGrouperSharding extends AnagramGrouper{
         this.shardDir = Paths.get(shardDirPath);
         this.shardDirPath = shardDirPath;
         this.outputMapCount = outputMapCount;
+        this.groupedNamesDir = Paths.get("GroupedFiles");
         Files.createDirectories(shardDir);
+        Files.createDirectories(groupedNamesDir);
     }
 
     public HashMap<AnagramKey, List<String>> getTable() throws Exception {
@@ -90,9 +93,87 @@ public class AnagramGrouperSharding extends AnagramGrouper{
         for (BufferedWriter writer : shardWriters) {
             writer.close();
         }
-
+        divideShardsProcessing(numShards, numThreads);
         return null;
     }
+
+    private void divideShardsProcessing(int numFiles, int numThreads) throws IOException
+    {
+        List<Path> files = new ArrayList<>();
+        int numOfUsedFiles = 0;
+        for (int i = 0; i < numFiles; i++) {
+            Path path = shardDir.resolve("shard_" + i + ".txt");
+            if(Files.size(path) == 0) continue;
+            files.add(path);
+            numOfUsedFiles++;
+        }
+        numFiles = numOfUsedFiles;
+
+        ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+
+        int baseSize = numFiles / numThreads;
+        int remainder = numFiles % numThreads;
+
+        int start = 0;
+        for (int i = 0; i < numThreads; i++) {
+            int taskSize = baseSize + (i < remainder ? 1 : 0);
+            int end = start + taskSize;
+
+            List<Path> subList = files.subList(start, end);
+            //using {} to avoid handling the exception
+            final int threadIndex = i; 
+            executor.submit(() -> {
+                Path threadDir = groupedNamesDir.resolve("thread_" + threadIndex);
+                Files.createDirectories(threadDir);
+                processFilesInThread(subList, threadDir);
+                return null;
+            });
+
+            start = end;
+        }
+
+        executor.shutdown();
+        try {
+            executor.awaitTermination(1, TimeUnit.HOURS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private void processFilesInThread(List<Path> files, Path threadDir) throws IOException
+    {
+        HashMap<AnagramKey,BufferedWriter> groupedFiles = new HashMap<>();
+        for (Path file : files) {
+            try(BufferedReader reader = Files.newBufferedReader(file) ){
+                String line;
+                while((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    AnagramKey key = new AnagramKey(line);
+                    BufferedWriter writer;
+                    if(groupedFiles.containsKey(key)) {
+                        writer = groupedFiles.get(key);
+                    }
+                    else {
+                        //sorting for readability
+                        char[] chars = line.toCharArray();
+                        Arrays.sort(chars);
+                        Path writerPath = threadDir.resolve( new String(chars) + ".txt" );
+                        writer = Files.newBufferedWriter(
+                            writerPath,
+                            StandardOpenOption.CREATE, 
+                            StandardOpenOption.APPEND
+                        );
+                        groupedFiles.put(key, writer);
+                    }
+                    writer.write(line);
+                    writer.newLine();
+                }
+            }
+        }
+        for (BufferedWriter writer : groupedFiles.values()) {
+            writer.close();
+        }
+    } 
 
     int betterABS(int i)
     {
